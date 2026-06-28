@@ -1,53 +1,82 @@
-Script de Auditoría de Seguridad y Hardening en Linux / Linux Security Audit & Hardening Script
-Este repositorio contiene una herramienta automatizada en Bash diseñada para la auditoría rápida de seguridad, la gestión proactiva de permisos críticos y el análisis defensivo de accesos dentro de sistemas operativos basados en Linux. Se enfoca en mitigar riesgos de persistencia y accesos no autorizados mediante configuraciones de diseño seguro.
+# Script de Auditoría de Seguridad y Hardening en Linux / Linux Security Audit & Hardening Script v2.0
 
-🇪🇸 Versión en Español
-🔍 Funcionalidades Principales
-El script ejecuta un protocolo defensivo automatizado dividido en tres fases críticas:
+Este repositorio contiene una herramienta automatizada en Bash para auditoría defensiva de seguridad en 5 fases: hardening de permisos, auditoría de usuarios y privilegios, análisis de logs con detección de fuerza bruta, detección de SUID/SGID anómalos y puertos, y generación de reportes TXT + JSON para integración SIEM.
 
-Hardening de Permisos Esenciales: Verifica y restringe proactivamente los accesos a los archivos más sensibles de la gestión de identidades locales, asegurando que /etc/passwd mantenga permisos de lectura general (644) y que el archivo de hashes de contraseñas /etc/shadow quede completamente blindado solo para el superusuario (600), bajo la propiedad estricta de root.
+---
 
-Auditoría de Identidades y Privilegios: Procesa las cuentas locales para identificar configuraciones anómalas o maliciosas buscando usuarios no autorizados con UID 0 (privilegios de root ocultos). Además, muestra en tiempo real las sesiones de usuarios actualmente activas en la máquina.
+## Espanol - Versión en Español
 
-Análisis Forense de Logs de Autenticación: Identifica de manera inteligente si el sistema es basado en Debian (auth.log) o RedHat (secure) y escanea las bitácoras para extraer los intentos de acceso fallidos más recientes, permitiendo la detección temprana de ataques de fuerza bruta.
+### Funcionalidades (5 Fases)
 
-🚀 Instrucciones de Uso
-El script requiere privilegios de superusuario para poder auditar e interactuar de forma segura con los registros de autenticación del sistema.
+| Fase | Descripción |
+|------|-------------|
+| **1. Hardening de Permisos** | Verifica y corrige permisos de 6 archivos críticos (`/etc/passwd`, `/etc/shadow`, `/etc/group`, `/etc/gshadow`, `/etc/sudoers`, `/etc/ssh/sshd_config`) con verificación previa (`stat -c %a`) y corrección de propietario `root:root`. |
+| **2. Auditoría de Usuarios** | Detecta usuarios con UID 0 no autorizados, miembros de `sudo`/`wheel`, cuentas sin contraseña, shells interactivas en cuentas de sistema, usuarios activos y procesos root. |
+| **3. Análisis de Logs y Persistencia** | Agregación de intentos fallidos por IP (detección de fuerza bruta), tareas cron de todos los usuarios, servicios systemd habilitados y accesos exitosos recientes. |
+| **4. SUID, Puertos y Conexiones** | Detección de binarios SUID/SGID anómalos con baseline de legítimos, puertos en escucha (`ss -tulnp`), conexiones establecidas y directorios world-writable. |
+| **5. Reportes SIEM-Ready** | Genera reporte dual: TXT legible + JSON estructurado con mapeo a CIS v8 e ISO 27001, listo para ingestión en Splunk, ELK o Wazuh. |
 
-Para ejecutarlo desde tu terminal:
+### Instrucciones de Uso
 
-Dar permisos de ejecución al archivo: chmod +x audit-security-essential.sh
+El script requiere privilegios de superusuario para auditar configuraciones del sistema y leer logs protegidos.
 
-Ejecutar la auditoría defensiva: sudo ./audit-security-essential.sh
+```bash
+chmod +x linux-hardening-scripts.sh
+sudo ./linux-hardening-scripts.sh            # Modo normal
+sudo ./linux-hardening-scripts.sh --quiet    # Solo reportes y archivos
+```
 
-📈 Valor Técnico y Buenas Prácticas
-Control Estricto de Errores: Implementa el estándar normativo set -euo pipefail, obligando al script a detenerse inmediatamente ante variables no definidas o fallas en tuberías, evitando ejecuciones erráticas en servidores de producción.
+### Salidas Generadas
 
-Automatización Agnóstica: Es capaz de autorregular su ruta de logs dependiendo de la distribución de Linux detectada.
+```
+/var/log/hardening-audit/
+├── audit-YYYYMMDD-HHMMSS.txt   # Reporte legible
+├── audit-YYYYMMDD-HHMMSS.json  # JSON para SIEM (findings + compliance mapping)
+└── hardening.log               # Log de cambios y eventos
+```
 
-🇺🇸 English Version
-🔍 Core Features
-The script executes an automated defensive workflow divided into three critical security phases:
+### Buenas Prácticas Implementadas
 
-Essential Permissions Hardening: Proactively checks and restricts access to the most sensitive local identity management files. It ensures /etc/passwd maintains standard read permissions (644) and completely locks down the password hash storage file /etc/shadow exclusively for the superuser (600), enforcing strict ownership to root:root.
+- `set -euo pipefail` para control estricto de errores
+- Verificación condicional de permisos antes de modificar (`stat -c %a`)
+- Detección cross-distro de logs (`/var/log/auth.log` vs `/var/log/secure`)
+- Fallback a `journalctl` para sistemas sin archivos de log tradicionales
+- Baseline de binarios SUID legítimos para reducir falsos positivos
+- Mapeo de hallazgos a controles CIS v8 e ISO 27001
 
-Identity & Privilege Auditing: Parses local system accounts to discover anomalous configuration baselines or persistence vectors by scanning for unauthorized users sharing UID 0 (hidden root privileges). It also outputs real-time active user sessions on the machine.
+---
 
-Authentication Log Forensic Analysis: Dynamically detects whether the host environment is Debian-based (auth.log) or RedHat-based (secure) and scans the logs to extract recent failed authentication attempts, providing early visibility into potential brute-force attacks.
+## English Version
 
-🚀 Usage Instructions
-The script requires superuser privileges to securely audit system configurations and read protected authentication logs.
+### Core Features (5 Phases)
 
-To run it from your terminal:
+| Phase | Description |
+|-------|-------------|
+| **1. Permission Hardening** | Verifies and fixes permissions on 6 critical files (`/etc/passwd`, `/etc/shadow`, `/etc/group`, `/etc/gshadow`, `/etc/sudoers`, `/etc/ssh/sshd_config`) with pre-check (`stat -c %a`) and `root:root` ownership enforcement. |
+| **2. User & Privilege Audit** | Detects unauthorized UID 0 users, `sudo`/`wheel` members, accounts without passwords, system accounts with interactive shells, active sessions, and root processes. |
+| **3. Log Analysis & Persistence** | IP-aggregated failed login attempts (brute force detection), per-user cron tasks, enabled systemd services, and recent successful access logs. |
+| **4. SUID, Ports & Connections** | Anomalous SUID/SGID binary detection against known-legitimate baseline, listening ports (`ss -tulnp`), established connections, and world-writable directories. |
+| **5. SIEM-Ready Reports** | Dual output: human-readable TXT + structured JSON with CIS v8 and ISO 27001 compliance mapping, ready for Splunk, ELK, or Wazuh ingestion. |
 
-Grant execution permissions: chmod +x audit-security-essential.sh
+### Usage
 
-Run the defensive security audit: sudo ./audit-security-essential.sh
+```bash
+chmod +x linux-hardening-scripts.sh
+sudo ./linux-hardening-scripts.sh            # Normal mode
+sudo ./linux-hardening-scripts.sh --quiet    # Reports and files only
+```
 
-📈 Technical Value & Best Practices
-Strict Error Handling: Implements the gold standard set -euo pipefail directive, forcing the shell to terminate immediately if any command or pipeline fails, preventing unintended execution paths on production servers.
+### Output Files
 
-Distro-Agnostic Automation: Intelligently resolves log locations depending on the detected Linux flavor.
+```
+/var/log/hardening-audit/
+├── audit-YYYYMMDD-HHMMSS.txt   # Human-readable report
+├── audit-YYYYMMDD-HHMMSS.json  # SIEM-ready JSON (findings + compliance mapping)
+└── hardening.log               # Change and event log
+```
 
-📄 Licencia / License
-Este proyecto está bajo la Licencia MIT / This project is licensed under the MIT License.
+---
+
+## Licencia / License
+
+MIT License - Mauricio Nunez G.
